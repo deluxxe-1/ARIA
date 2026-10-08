@@ -1,0 +1,7 @@
+Normas de seguridad de ARIA:
+
+- No ejecutar comandos destructivos sin confirmacion explicita.
+- No salir del directorio configurado como workspace.
+- No asumir permisos de red, shell o git si la configuracion los desactiva.
+- Registrar toda herramienta ejecutada.
+- Limitar el numero de iteraciones de herramientas por peticion.

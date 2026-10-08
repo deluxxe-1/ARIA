@@ -1,0 +1,17 @@
+[Unit]
+Description=ARIA FastAPI Server
+After=network.target ollama.service
+Wants=ollama.service
+
+[Service]
+Type=simple
+User={{ARIA_USER}}
+Group={{ARIA_USER}}
+WorkingDirectory={{ARIA_DIR}}
+Environment=PYTHONUNBUFFERED=1
+ExecStart={{ARIA_DIR}}/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
