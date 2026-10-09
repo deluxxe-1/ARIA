@@ -1,0 +1,63 @@
+[Unit]
+Description=Ollama LLM Runtime (GPU RTX 3060 12GB)
+After=network-online.target nvidia-persistenced.service
+Wants=network-online.target nvidia-persistenced.service
+
+[Service]
+Type=simple
+User=aria
+Group=aria
+WorkingDirectory=/var/lib/ollama
+
+# ===== GPU CUDA / RTX 3060 (CC=8.6) =====
+Environment=OLLAMA_HOST=127.0.0.1
+Environment=OLLAMA_PORT=11434
+Environment=OLLAMA_ORIGINS=http://127.0.0.1:*
+Environment=CUDA_VISIBLE_DEVICES=0
+Environment=CUDA_MODULE_LOADING=LAZY
+Environment=OLLAMA_NUM_PARALLEL=4
+Environment=OLLAMA_MAX_LOADED_MODELS=2
+Environment=OLLAMA_KEEP_ALIVE=30m
+Environment=OLLAMA_FLASH_ATTN=1
+# Qwen3:8b int4 ~6GB, Qwen2.5-Coder:7b int4 ~5GB → 12GB alcanza ambos
+Environment=OLLAMA_GPU_LAYERS=99
+Environment=PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu
+
+# ===== Hardening =====
+UMask=0027
+CPUQuota=300%
+MemoryMax=12G
+MemoryHigh=10G
+TasksMax=1024
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=false
+ProtectSystem=strict
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+ReadWritePaths=/var/lib/ollama /tmp
+
+ExecStartPre=/bin/mkdir -p /var/lib/ollama
+ExecStartPre=/bin/chown -R aria:aria /var/lib/ollama
+ExecStart=/usr/local/bin/ollama serve
+
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=120
+TimeoutStopSec=45
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ollama
+
+[Install]
+WantedBy=multi-user.target

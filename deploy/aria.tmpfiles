@@ -1,0 +1,12 @@
+# tmpfiles.d — directorios de trabajo/aria con permisos correctos
+# Instalar: cp deploy/aria.tmpfiles /usr/lib/tmpfiles.d/aria.conf && systemd-tmpfiles --create
+d  /opt/aria                          0750 aria aria - -
+d  /opt/aria/storage                  0750 aria aria - -
+d  /opt/aria/storage/voice_profiles  0750 aria aria - -
+d  /opt/aria/storage/voice_outputs   0750 aria aria - -
+d  /opt/aria/workspaces             0750 aria aria - -
+d  /opt/aria/workspaces/projects     0750 aria aria - -
+d  /opt/aria/logs                    2750 aria aria - -
+d  /var/lib/ollama                   0750 aria aria - -
+Z  /opt/aria                          -    aria aria - -
+Z  /var/lib/ollama                   -    aria aria - -

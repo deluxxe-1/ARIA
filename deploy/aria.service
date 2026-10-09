@@ -1,17 +1,73 @@
 [Unit]
-Description=ARIA FastAPI Server
-After=network.target ollama.service
-Wants=ollama.service
+Description=ARIA Personal Assistant FastAPI Server
+Documentation=file:/opt/aria/deploy/UBUNTU_SERVER_GPU_INSTALL.md
+After=network-online.target ollama.service
+Wants=network-online.target ollama.service
 
 [Service]
 Type=simple
-User={{ARIA_USER}}
-Group={{ARIA_USER}}
-WorkingDirectory={{ARIA_DIR}}
+User=aria
+Group=aria
+WorkingDirectory=/opt/aria
+
 Environment=PYTHONUNBUFFERED=1
-ExecStart={{ARIA_DIR}}/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
-Restart=always
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PATH=/opt/aria/.venv/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=LD_LIBRARY_PATH=/usr/local/cuda/lib64
+Environment=CUDA_VISIBLE_DEVICES=0
+
+# GPU optimización RTX 3060
+Environment=TOKENIZERS_PARALLELISM=true
+Environment=OMP_NUM_THREADS=4
+Environment=OLLAMA_NUM_PARALLEL=4
+Environment=OLLAMA_MAX_LOADED_MODELS=2
+
+# Límite de recursos compatible i7-9700 (8C/8T) + 16GB RAM
+UMask=0027
+CPUQuota=700%
+MemoryMax=10G
+MemoryHigh=8G
+TasksMax=256
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=false
+ProtectSystem=strict
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectClock=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+ReadWritePaths=/opt/aria/storage /opt/aria/workspaces
+ReadOnlyPaths=/opt/aria/app /opt/aria/.venv /opt/aria/alembic
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+ExecStart=/opt/aria/.venv/bin/uvicorn app.main:app \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --workers 2 \
+    --loop uvloop \
+    --http httptools \
+    --timeout-keep-alive 30
+
+TimeoutStopSec=30
+KillSignal=SIGTERM
+Restart=on-failure
 RestartSec=5
+StartLimitBurst=3
+StartLimitIntervalSec=60
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aria
 
 [Install]
 WantedBy=multi-user.target

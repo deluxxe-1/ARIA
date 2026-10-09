@@ -1,0 +1,3 @@
+# Sistema sysusers.d — crear usuario/grupo dedicado ARIA sin shell login
+# Instalar: cp deploy/aria.sysusers /usr/lib/sysusers.d/aria.conf && systemd-sysusers
+u aria  -  "ARIA Personal Assistant"  /opt/aria  /usr/sbin/nologin
