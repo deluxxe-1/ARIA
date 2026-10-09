@@ -1,0 +1,221 @@
+Metadata-Version: 2.4
+Name: aria-assistant
+Version: 0.1.0
+Summary: ARIA: asistente personal local con arquitectura dual LLM, FastAPI + cliente Flutter nativo.
+Author: Equipo ARIA
+License: Propietario / Privado
+Project-URL: Repository, local
+Project-URL: Documentation, docs/
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi==0.116.1
+Requires-Dist: uvicorn[standard]==0.35.0
+Requires-Dist: httpx==0.28.1
+Requires-Dist: python-multipart==0.0.20
+Requires-Dist: pydantic==2.11.7
+Requires-Dist: pydantic-settings==2.10.1
+Requires-Dist: duckduckgo-search==8.1.1
+Requires-Dist: beautifulsoup4==4.13.4
+Requires-Dist: python-slugify==8.0.4
+Requires-Dist: structlog==25.4.0
+Requires-Dist: aiosqlite==0.20.0
+Requires-Dist: sqlalchemy[asyncio]==2.0.36
+Requires-Dist: alembic==1.13.3
+Provides-Extra: voice
+Requires-Dist: faster-whisper==1.1.1; extra == "voice"
+Provides-Extra: dev
+Requires-Dist: pytest==8.4.1; extra == "dev"
+Requires-Dist: pytest-asyncio==0.24.0; extra == "dev"
+Requires-Dist: ruff==0.9.7; extra == "dev"
+Requires-Dist: mypy==1.13.0; extra == "dev"
+Requires-Dist: pre-commit==4.0.1; extra == "dev"
+Requires-Dist: types-setuptools; extra == "dev"
+
+# ARIA
+
+ARIA es un asistente personal local con arquitectura dual y fase 2 nativa:
+
+- `Qwen 3` como planner y router principal
+- `Qwen 2.5-Coder` como especialista en generacion de codigo
+- `FastAPI` como API local
+- `Ollama` como runtime de modelos
+- `SQLite` + `SQLAlchemy 2` + `Alembic` para memoria persistente y migraciones
+- `Flutter` para app de escritorio y app movil
+- Perfiles de voz y chat por audio
+
+## Estructura
+
+```text
+app/
+  admin/        # Tareas administrativas (limpieza storage, etc.)
+  api/          # Routers REST FastAPI
+  core/         # Configuracion, errores, abstracciones, router, policies, logger
+  db/           # SQLAlchemy models y session factory
+  memory/       # MemoryStore (ChatMemory Protocol)
+  middleware/   # Request ID, API Key, Rate Limit
+  models/       # OllamaClient, PlannerLLM, CoderLLM
+  prompts/      # System prompts
+  schemas/      # Pydantic schemas (I/O)
+  services/     # ProjectService, TaskService, VoiceService
+  tools/        # Implementacion de herramientas (shell, git, fs, web)
+  voice/        # ProfileStore + SpeechService
+alembic/        # Revisiones Alembic
+storage/
+workspaces/projects/
+tests/
+clients/aria_native/
+docs/
+```
+
+## Requisitos
+
+- Python 3.12 o superior
+- Ollama instalado y en ejecucion
+- Modelos descargados:
+  - `qwen3:8b`
+  - `qwen2.5-coder:7b`
+
+## Instalacion
+
+Origen unico de las dependencias: `pyproject.toml` (PEP 621).
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e .[dev]
+copy .env.example .env
+```
+
+Grupos opcionales disponibles:
+
+| Grupo | Contenido | Comando |
+|---|---|---|
+| Core (por defecto) | fastapi, httpx, sqlalchemy, alembic, structlog, aiosqlite, herramientas | `pip install -e .` |
+| voice | faster-whisper STT local | `pip install -e .[voice]` |
+| dev | pytest, pytest-asyncio, ruff, mypy, pre-commit | `pip install -e .[dev]` |
+| todo | Core + voice + dev | `pip install -e .[voice,dev]` |
+
+## Modelos
+
+```bash
+ollama pull qwen3:8b
+ollama pull qwen2.5-coder:7b
+```
+
+## Ejecucion
+
+```bash
+uvicorn app.main:app --reload
+```
+
+## Tests
+
+```bash
+pytest -v
+```
+
+## Calidad y Pre-commit
+
+```bash
+pip install -e .[dev]
+ruff check .
+ruff format --check .
+mypy
+pre-commit install
+pre-commit run --all-files
+```
+
+## Migraciones de Base de Datos
+
+Gestionadas con Alembic sobre `SQLite+aiosqlite`:
+
+```bash
+# Status
+alembic current
+
+# Actualizar a ultima version (se hace automaticamente en lifespan si auto_migrate=True)
+alembic upgrade head
+
+# Crear nueva revision a partir de los models SQLAlchemy
+alembic revision --autogenerate -m "descripcion_cambio"
+
+# Volver una revision atras
+alembic downgrade -1
+```
+
+Backwards compatible: bases de datos antiguas creadas directamente con `sqlite3` reciben `alembic stamp head` en el arranque y pasan a ser gestionadas sin tocar los datos.
+
+## Despliegue en Ubuntu Server
+
+- Plantilla `systemd`: `deploy/aria.service`
+- Script de instalacion: `scripts/install_aria_ubuntu.sh`
+- Script de drivers NVIDIA: `scripts/install_nvidia_ubuntu.sh`
+- Guia paso a paso: `docs/ubuntu-server-setup.md`
+- Transferencia e instalacion completa: `docs/transfer-and-install.md`
+
+## Voz
+
+Sin `voice` group se pueden subir audios y perfiles (endpoints no usan Whisper directamente).
+Para activar transcripcion local real (STT):
+
+```bash
+pip install -e .[voice]
+```
+
+## Endpoints Iniciales
+
+- `GET /health`
+- `POST /chat`
+- `POST /chat/stream` (streaming SSE: tool_call, token, done)
+- `POST /task/run`
+- `POST /project/create`
+- `GET /voice/profiles`
+- `POST /voice/profiles`
+- `POST /voice/transcribe`
+- `POST /voice/synthesize`
+- `POST /voice/chat`
+- `POST /admin/cleanup`
+
+## Configuracion (via `.env` con prefijo `ARIA_`)
+
+| Variable | Valor por defecto | Descripcion |
+|---|---|---|
+| `ARIA_OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | URL servidor Ollama |
+| `ARIA_ALLOW_SHELL` | `false` | Permite ejecutar comandos shell via herramientas |
+| `ARIA_ENABLE_CORS` | `true` | Activar middleware CORS |
+| `ARIA_CORS_ORIGINS` | `["*"]` | Lista JSON de orígenes permitidos |
+| `ARIA_ENABLE_API_KEY` | `false` | Requerir header `X-ARIA-Key` |
+| `ARIA_API_KEY` | `""` | Valor de la clave cuando está activada |
+| `ARIA_ENABLE_RATE_LIMIT` | `true` | Limitar peticiones por IP/minuto |
+| `ARIA_RATE_LIMIT_PER_MINUTE` | `60` | Peticiones por IP/ventana 60s |
+| `ARIA_VOICE_MAX_UPLOAD_MB` | `50` | Tamaño máximo de subida de audio |
+| `ARIA_VOICE_OUTPUTS_TTL_HOURS` | `24` | TTL de audios sintetizados temporales |
+| `ARIA_AUTO_MIGRATE` | `true` | Ejecutar `alembic upgrade head` al arrancar |
+| `ARIA_AUTO_CLEANUP_ON_STARTUP` | `true` | Purgar audios antiguos al arrancar |
+
+## Cliente Flutter Nativo
+
+Ver `clients/aria_native/README.md`. Opciones de compilacion:
+
+| Plataforma | Flags |
+|---|---|
+| Windows Desktop | `flutter run -d windows` |
+| Android Emulator | `flutter run -d android --dart-define=ARIA_API_URL=http://10.0.2.2:8000` |
+| Android LAN | `flutter run -d android --dart-define=ARIA_API_URL=http://<IP_PC>:8000 --dart-define=ARIA_API_KEY=<key>  # si activada` |
+
+## Flujo Base
+
+1. El usuario envia un prompt a `POST /chat`.
+2. El router decide si la tarea es general o de codigo.
+3. `Qwen 3` planifica y puede usar herramientas.
+4. `Qwen 2.5-Coder` entra cuando la tarea requiere generar o editar codigo.
+5. La sesion se guarda en `SQLite`.
+
+## Notas
+
+- El shell esta desactivado por defecto por seguridad.
+- Todas las herramientas trabajan dentro de `workspaces/projects` y `ensure_within_workspace` impide path traversal.
+- `shell_tool` y `git_tool` usan `asyncio.create_subprocess_exec` sin `shell=True`. Argumentos siempre en lista via `shlex.split`.
+- La app nativa esta en `clients/aria_native`.
+- La guia de clonacion de voz esta en `docs/voice-cloning.md`.
+- Este repositorio es un MVP funcional y ampliable.

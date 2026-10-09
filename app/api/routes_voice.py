@@ -1,5 +1,9 @@
+from pathlib import Path
+
 from fastapi import APIRouter, File, Form, Request, UploadFile
 
+from app.core.errors import InvalidUploadError, UploadTooLargeError
+from app.core.settings import Settings
 from app.schemas.voice import (
     AudioChatResponse,
     VoiceProfileListResponse,
@@ -11,6 +15,21 @@ from app.schemas.voice import (
 
 
 router = APIRouter(prefix="/voice", tags=["voice"])
+
+
+async def _validate_upload(file: UploadFile, settings: Settings) -> None:
+    filename = (file.filename or "file").lower()
+    suffix = Path(filename).suffix.lstrip(".")
+    allowed = {ext.lower() for ext in settings.voice_allowed_extensions}
+    if suffix not in allowed:
+        raise InvalidUploadError(
+            f"Extension no permitida. Extensiones admitidas: {', '.join(sorted(allowed))}"
+        )
+
+    if file.size is not None and file.size > settings.voice_max_upload_mb * 1024 * 1024:
+        raise UploadTooLargeError(
+            f"Archivo demasiado grande. Limite: {settings.voice_max_upload_mb} MB."
+        )
 
 
 @router.get("/profiles", response_model=VoiceProfileListResponse)
@@ -27,8 +46,15 @@ async def create_profile(
     transcript_hint: str | None = Form(None),
     sample: UploadFile = File(...),
 ) -> VoiceProfileResponse:
+    settings: Settings = request.app.state.settings
+    await _validate_upload(sample, settings)
     voice_service = request.app.state.voice_service
     audio_bytes = await sample.read()
+    size_limit = settings.voice_max_upload_mb * 1024 * 1024
+    if len(audio_bytes) > size_limit:
+        raise UploadTooLargeError(
+            f"Archivo demasiado grande. Limite: {settings.voice_max_upload_mb} MB."
+        )
     return voice_service.create_profile(
         name=name,
         language=language,
@@ -43,8 +69,15 @@ async def transcribe_audio(
     request: Request,
     audio: UploadFile = File(...),
 ) -> VoiceTranscriptionResponse:
+    settings: Settings = request.app.state.settings
+    await _validate_upload(audio, settings)
     voice_service = request.app.state.voice_service
     audio_bytes = await audio.read()
+    size_limit = settings.voice_max_upload_mb * 1024 * 1024
+    if len(audio_bytes) > size_limit:
+        raise UploadTooLargeError(
+            f"Archivo demasiado grande. Limite: {settings.voice_max_upload_mb} MB."
+        )
     return await voice_service.transcribe_upload(
         audio_bytes=audio_bytes,
         filename=audio.filename or "audio.wav",
@@ -71,8 +104,15 @@ async def audio_chat(
     session_id: str | None = Form(None),
     voice_id: str | None = Form(None),
 ) -> AudioChatResponse:
+    settings: Settings = request.app.state.settings
+    await _validate_upload(audio, settings)
     voice_service = request.app.state.voice_service
     audio_bytes = await audio.read()
+    size_limit = settings.voice_max_upload_mb * 1024 * 1024
+    if len(audio_bytes) > size_limit:
+        raise UploadTooLargeError(
+            f"Archivo demasiado grande. Limite: {settings.voice_max_upload_mb} MB."
+        )
     return await voice_service.audio_chat(
         audio_bytes=audio_bytes,
         filename=audio.filename or "audio.wav",

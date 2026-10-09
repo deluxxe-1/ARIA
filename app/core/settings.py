@@ -25,6 +25,23 @@ class Settings(BaseSettings):
     stt_backend: str = "faster-whisper"
     enable_native_apps: bool = True
 
+    enable_cors: bool = True
+    cors_origins: list[str] = Field(default_factory=lambda: ["*"])
+
+    enable_api_key: bool = False
+    api_key: str | None = None
+
+    enable_rate_limit: bool = True
+    rate_limit_per_minute: int = Field(default=60, ge=1, le=10000)
+
+    voice_max_upload_mb: int = Field(default=50, ge=1, le=2048)
+    voice_allowed_extensions: list[str] = Field(default_factory=lambda: ["wav", "mp3", "m4a", "ogg"])
+
+    voice_outputs_ttl_hours: int = Field(default=24, ge=1, le=24 * 365)
+    auto_cleanup_on_startup: bool = True
+
+    auto_migrate: bool = True
+
     @property
     def sqlite_path_abs(self) -> Path:
         return Path(self.sqlite_path).resolve()

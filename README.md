@@ -6,7 +6,7 @@ ARIA es un asistente personal local con arquitectura dual y fase 2 nativa:
 - `Qwen 2.5-Coder` como especialista en generacion de codigo
 - `FastAPI` como API local
 - `Ollama` como runtime de modelos
-- `SQLite` para memoria persistente
+- `SQLite` + `SQLAlchemy 2` + `Alembic` para memoria persistente y migraciones
 - `Flutter` para app de escritorio y app movil
 - Perfiles de voz y chat por audio
 
@@ -14,14 +14,19 @@ ARIA es un asistente personal local con arquitectura dual y fase 2 nativa:
 
 ```text
 app/
-  api/
-  core/
-  memory/
-  models/
-  prompts/
-  schemas/
-  services/
-  tools/
+  admin/        # Tareas administrativas (limpieza storage, etc.)
+  api/          # Routers REST FastAPI
+  core/         # Configuracion, errores, abstracciones, router, policies, logger
+  db/           # SQLAlchemy models y session factory
+  memory/       # MemoryStore (ChatMemory Protocol)
+  middleware/   # Request ID, API Key, Rate Limit
+  models/       # OllamaClient, PlannerLLM, CoderLLM
+  prompts/      # System prompts
+  schemas/      # Pydantic schemas (I/O)
+  services/     # ProjectService, TaskService, VoiceService
+  tools/        # Implementacion de herramientas (shell, git, fs, web)
+  voice/        # ProfileStore + SpeechService
+alembic/        # Revisiones Alembic
 storage/
 workspaces/projects/
 tests/
@@ -39,12 +44,23 @@ docs/
 
 ## Instalacion
 
+Origen unico de las dependencias: `pyproject.toml` (PEP 621).
+
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e .[dev]
 copy .env.example .env
 ```
+
+Grupos opcionales disponibles:
+
+| Grupo | Contenido | Comando |
+|---|---|---|
+| Core (por defecto) | fastapi, httpx, sqlalchemy, alembic, structlog, aiosqlite, herramientas | `pip install -e .` |
+| voice | faster-whisper STT local | `pip install -e .[voice]` |
+| dev | pytest, pytest-asyncio, ruff, mypy, pre-commit | `pip install -e .[dev]` |
+| todo | Core + voice + dev | `pip install -e .[voice,dev]` |
 
 ## Modelos
 
@@ -59,6 +75,43 @@ ollama pull qwen2.5-coder:7b
 uvicorn app.main:app --reload
 ```
 
+## Tests
+
+```bash
+pytest -v
+```
+
+## Calidad y Pre-commit
+
+```bash
+pip install -e .[dev]
+ruff check .
+ruff format --check .
+mypy
+pre-commit install
+pre-commit run --all-files
+```
+
+## Migraciones de Base de Datos
+
+Gestionadas con Alembic sobre `SQLite+aiosqlite`:
+
+```bash
+# Status
+alembic current
+
+# Actualizar a ultima version (se hace automaticamente en lifespan si auto_migrate=True)
+alembic upgrade head
+
+# Crear nueva revision a partir de los models SQLAlchemy
+alembic revision --autogenerate -m "descripcion_cambio"
+
+# Volver una revision atras
+alembic downgrade -1
+```
+
+Backwards compatible: bases de datos antiguas creadas directamente con `sqlite3` reciben `alembic stamp head` en el arranque y pasan a ser gestionadas sin tocar los datos.
+
 ## Despliegue en Ubuntu Server
 
 - Plantilla `systemd`: `deploy/aria.service`
@@ -69,22 +122,18 @@ uvicorn app.main:app --reload
 
 ## Voz
 
-Instalacion minima para subir audios y perfiles:
+Sin `voice` group se pueden subir audios y perfiles (endpoints no usan Whisper directamente).
+Para activar transcripcion local real (STT):
 
 ```bash
-pip install -r requirements.txt
-```
-
-Si quieres activar transcripcion local real:
-
-```bash
-pip install -r requirements-voice.txt
+pip install -e .[voice]
 ```
 
 ## Endpoints Iniciales
 
 - `GET /health`
 - `POST /chat`
+- `POST /chat/stream` (streaming SSE: tool_call, token, done)
 - `POST /task/run`
 - `POST /project/create`
 - `GET /voice/profiles`
@@ -92,6 +141,34 @@ pip install -r requirements-voice.txt
 - `POST /voice/transcribe`
 - `POST /voice/synthesize`
 - `POST /voice/chat`
+- `POST /admin/cleanup`
+
+## Configuracion (via `.env` con prefijo `ARIA_`)
+
+| Variable | Valor por defecto | Descripcion |
+|---|---|---|
+| `ARIA_OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | URL servidor Ollama |
+| `ARIA_ALLOW_SHELL` | `false` | Permite ejecutar comandos shell via herramientas |
+| `ARIA_ENABLE_CORS` | `true` | Activar middleware CORS |
+| `ARIA_CORS_ORIGINS` | `["*"]` | Lista JSON de orígenes permitidos |
+| `ARIA_ENABLE_API_KEY` | `false` | Requerir header `X-ARIA-Key` |
+| `ARIA_API_KEY` | `""` | Valor de la clave cuando está activada |
+| `ARIA_ENABLE_RATE_LIMIT` | `true` | Limitar peticiones por IP/minuto |
+| `ARIA_RATE_LIMIT_PER_MINUTE` | `60` | Peticiones por IP/ventana 60s |
+| `ARIA_VOICE_MAX_UPLOAD_MB` | `50` | Tamaño máximo de subida de audio |
+| `ARIA_VOICE_OUTPUTS_TTL_HOURS` | `24` | TTL de audios sintetizados temporales |
+| `ARIA_AUTO_MIGRATE` | `true` | Ejecutar `alembic upgrade head` al arrancar |
+| `ARIA_AUTO_CLEANUP_ON_STARTUP` | `true` | Purgar audios antiguos al arrancar |
+
+## Cliente Flutter Nativo
+
+Ver `clients/aria_native/README.md`. Opciones de compilacion:
+
+| Plataforma | Flags |
+|---|---|
+| Windows Desktop | `flutter run -d windows` |
+| Android Emulator | `flutter run -d android --dart-define=ARIA_API_URL=http://10.0.2.2:8000` |
+| Android LAN | `flutter run -d android --dart-define=ARIA_API_URL=http://<IP_PC>:8000 --dart-define=ARIA_API_KEY=<key>  # si activada` |
 
 ## Flujo Base
 
@@ -104,7 +181,8 @@ pip install -r requirements-voice.txt
 ## Notas
 
 - El shell esta desactivado por defecto por seguridad.
-- Todas las herramientas trabajan dentro de `workspaces/projects`.
+- Todas las herramientas trabajan dentro de `workspaces/projects` y `ensure_within_workspace` impide path traversal.
+- `shell_tool` y `git_tool` usan `asyncio.create_subprocess_exec` sin `shell=True`. Argumentos siempre en lista via `shlex.split`.
 - La app nativa esta en `clients/aria_native`.
 - La guia de clonacion de voz esta en `docs/voice-cloning.md`.
 - Este repositorio es un MVP funcional y ampliable.

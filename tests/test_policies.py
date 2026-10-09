@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from app.core.errors import WorkspaceBoundaryError
 from app.core.policies import ensure_within_workspace
 

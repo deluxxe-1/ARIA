@@ -2,7 +2,6 @@ from pathlib import Path
 
 import aiosqlite
 import pytest
-
 from app.memory.store import MemoryStore
 
 

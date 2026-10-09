@@ -36,9 +36,6 @@ class PlannerLLM:
         )
 
     async def plan_for_code(self, history: list[dict[str, Any]], prompt: str) -> str:
-        planning_prompt = (
-            "Crea un plan breve y accionable para que el modelo coder resuelva esta tarea.\n\n"
-            f"Tarea:\n{prompt}"
-        )
+        planning_prompt = f"Crea un plan breve y accionable para que el modelo coder resuelva esta tarea.\n\nTarea:\n{prompt}"
         response = await self.chat(history=history, prompt=planning_prompt)
         return response.get("message", {}).get("content", "").strip()

@@ -16,3 +16,19 @@ class ToolNotSupportedError(ARIAError):
 
 class VoiceBackendError(ARIAError):
     pass
+
+
+class UploadTooLargeError(ARIAError):
+    pass
+
+
+class InvalidUploadError(ARIAError):
+    pass
+
+
+class UnauthorizedError(ARIAError):
+    pass
+
+
+class RateLimitError(ARIAError):
+    pass

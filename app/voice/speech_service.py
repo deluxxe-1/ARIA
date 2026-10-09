@@ -4,7 +4,11 @@ from typing import Any
 from uuid import uuid4
 
 from app.core.errors import VoiceBackendError
-from app.schemas.voice import VoiceProfileResponse, VoiceSynthesizeResponse, VoiceTranscriptionResponse
+from app.schemas.voice import (
+    VoiceProfileResponse,
+    VoiceSynthesizeResponse,
+    VoiceTranscriptionResponse,
+)
 
 
 class SpeechService:
@@ -22,9 +26,7 @@ class SpeechService:
         try:
             from faster_whisper import WhisperModel
         except ImportError as exc:
-            raise VoiceBackendError(
-                "Para transcribir audio instala 'pip install -r requirements-voice.txt'."
-            ) from exc
+            raise VoiceBackendError("Para transcribir audio instala 'pip install -r requirements-voice.txt'.") from exc
 
         self._whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
         return self._whisper_model
@@ -53,10 +55,7 @@ class SpeechService:
         output_path = self.outputs_dir / f"{profile.voice_id}_{timestamp}_{uuid4().hex[:8]}.wav"
 
         if self.voice_backend == "xttsv2":
-            message = (
-                "Perfil listo para clonacion con XTTS v2. "
-                "Conecta un runtime de TTS local para generar el wav definitivo."
-            )
+            message = "Perfil listo para clonacion con XTTS v2. Conecta un runtime de TTS local para generar el wav definitivo."
             output_path.write_bytes(b"")
             return VoiceSynthesizeResponse(
                 output_path=str(output_path),

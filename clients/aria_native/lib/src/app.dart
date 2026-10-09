@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'core/services/session_id_service.dart';
 import 'features/chat/presentation/chat_screen.dart';
 import 'features/voice/presentation/voice_screen.dart';
 
@@ -9,14 +11,17 @@ class AriaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ARIA',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        useMaterial3: true,
+    return ChangeNotifierProvider(
+      create: (_) => SessionIdService()..load(),
+      child: MaterialApp(
+        title: 'ARIA',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+          useMaterial3: true,
+        ),
+        home: const _AriaShell(),
       ),
-      home: const _AriaShell(),
     );
   }
 }

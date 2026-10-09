@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-
 CODE_KEYWORDS = {
     "codigo",
     "programa",

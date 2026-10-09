@@ -1,7 +1,5 @@
-from fastapi import APIRouter, Request
-
 from app.schemas.projects import ProjectCreateRequest, ProjectCreateResponse
-
+from fastapi import APIRouter, Request
 
 router = APIRouter(tags=["projects"])
 

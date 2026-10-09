@@ -1,10 +1,10 @@
 import json
 from uuid import uuid4
 
+from app.core.abstractions import ChatMemory, LLMProvider
 from app.core.router import TaskRouter
 from app.core.settings import Settings
 from app.core.tool_gateway import ToolGateway
-from app.memory.store import MemoryStore
 from app.models.coder_llm import CoderLLM
 from app.models.planner_llm import PlannerLLM
 from app.schemas.chat import ChatRequest, ChatResponse, ToolExecution
@@ -14,16 +14,16 @@ class Orchestrator:
     def __init__(
         self,
         settings: Settings,
-        memory: MemoryStore,
+        memory: ChatMemory,
         router: TaskRouter,
         planner: PlannerLLM,
         coder: CoderLLM,
         tool_gateway: ToolGateway,
     ) -> None:
         self.settings = settings
-        self.memory = memory
+        self.memory: ChatMemory = memory
         self.router = router
-        self.planner = planner
+        self.planner: LLMProvider | PlannerLLM = planner
         self.coder = coder
         self.tool_gateway = tool_gateway
 

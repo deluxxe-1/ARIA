@@ -1,7 +1,6 @@
 import json
 
 import pytest
-
 from app.core.errors import ToolNotSupportedError
 from app.core.settings import get_settings
 from app.core.tool_gateway import ToolGateway

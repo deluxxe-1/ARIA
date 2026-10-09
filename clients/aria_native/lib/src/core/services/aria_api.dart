@@ -8,7 +8,7 @@ import '../models/chat_models.dart';
 
 
 class AriaApi {
-  AriaApi({String? baseUrl})
+  AriaApi({String? baseUrl, this.apiKey})
       : baseUrl = baseUrl ??
             const String.fromEnvironment(
               'ARIA_API_URL',
@@ -16,6 +16,15 @@ class AriaApi {
             );
 
   final String baseUrl;
+  final String? apiKey;
+
+  Map<String, String> _headers() {
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (apiKey != null && apiKey!.isNotEmpty) {
+      headers['X-ARIA-Key'] = apiKey!;
+    }
+    return headers;
+  }
 
   Future<String> sendChat(String prompt, {String? sessionId}) async {
     final body = <String, dynamic>{
@@ -28,7 +37,7 @@ class AriaApi {
 
     final response = await http.post(
       Uri.parse('$baseUrl/chat'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers(),
       body: jsonEncode(body),
     );
 
@@ -41,7 +50,10 @@ class AriaApi {
   }
 
   Future<List<VoiceProfile>> listProfiles() async {
-    final response = await http.get(Uri.parse('$baseUrl/voice/profiles'));
+    final response = await http.get(
+      Uri.parse('$baseUrl/voice/profiles'),
+      headers: apiKey != null && apiKey!.isNotEmpty ? {'X-ARIA-Key': apiKey!} : null,
+    );
     if (response.statusCode >= 400) {
       throw Exception('No se pudieron cargar los perfiles de voz.');
     }
@@ -64,6 +76,10 @@ class AriaApi {
     )
       ..fields['name'] = name
       ..fields['language'] = language;
+
+    if (apiKey != null && apiKey!.isNotEmpty) {
+      request.headers['X-ARIA-Key'] = apiKey!;
+    }
 
     if (transcriptHint != null && transcriptHint.isNotEmpty) {
       request.fields['transcript_hint'] = transcriptHint;
@@ -93,6 +109,10 @@ class AriaApi {
       Uri.parse('$baseUrl/voice/chat'),
     );
 
+    if (apiKey != null && apiKey!.isNotEmpty) {
+      request.headers['X-ARIA-Key'] = apiKey!;
+    }
+
     if (sessionId != null && sessionId.isNotEmpty) {
       request.fields['session_id'] = sessionId;
     }
@@ -115,5 +135,31 @@ class AriaApi {
 
     final body = await response.stream.bytesToString();
     return jsonDecode(body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> synthesizeVoice({
+    required String text,
+    String? voiceId,
+    String language = 'es',
+  }) async {
+    final body = <String, dynamic>{
+      'text': text,
+      'language': language,
+    };
+    if (voiceId != null && voiceId.isNotEmpty) {
+      body['voice_id'] = voiceId;
+    }
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/voice/synthesize'),
+      headers: _headers(),
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception('Error sintetizando voz: ${response.body}');
+    }
+
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 }

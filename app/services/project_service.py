@@ -1,10 +1,8 @@
 import json
-from pathlib import Path
-
-from slugify import slugify
 
 from app.core.settings import Settings
 from app.schemas.projects import ProjectCreateRequest, ProjectCreateResponse
+from slugify import slugify
 
 
 class ProjectService:

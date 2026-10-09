@@ -1,10 +1,6 @@
-import re
 from pathlib import Path
 
 import pytest
-from fastapi import APIRouter, FastAPI
-from fastapi.testclient import TestClient
-
 from app.core.errors import (
     ProfileNotFoundError,
     ToolNotSupportedError,
@@ -12,6 +8,8 @@ from app.core.errors import (
     WorkspaceBoundaryError,
 )
 from app.main import create_app
+from fastapi import APIRouter, FastAPI
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture
@@ -86,4 +84,3 @@ def test_unhandled_exception_maps_to_500_without_leak(
     body = response.json()
     assert "error interno" in body["detail"].lower() or "procesando" in body["detail"].lower()
     assert str(Path.home()) not in body.get("detail", "")
-

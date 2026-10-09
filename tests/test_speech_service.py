@@ -1,10 +1,8 @@
 import sys
 import types
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
-
 from app.core.errors import VoiceBackendError
 from app.voice.speech_service import SpeechService
 

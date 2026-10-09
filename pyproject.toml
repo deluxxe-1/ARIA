@@ -1,0 +1,93 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aria-assistant"
+version = "0.1.0"
+description = "ARIA: asistente personal local con arquitectura dual LLM, FastAPI + cliente Flutter nativo."
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "Propietario / Privado"}
+authors = [
+    {name = "Equipo ARIA"},
+]
+dependencies = [
+    "fastapi==0.116.1",
+    "uvicorn[standard]==0.35.0",
+    "httpx==0.28.1",
+    "python-multipart==0.0.20",
+    "pydantic==2.11.7",
+    "pydantic-settings==2.10.1",
+    "duckduckgo-search==8.1.1",
+    "beautifulsoup4==4.13.4",
+    "python-slugify==8.0.4",
+    "structlog==25.4.0",
+    "aiosqlite==0.20.0",
+    "sqlalchemy[asyncio]==2.0.36",
+    "alembic==1.13.3",
+]
+
+[project.optional-dependencies]
+voice = [
+    "faster-whisper==1.1.1",
+]
+dev = [
+    "pytest==8.4.1",
+    "pytest-asyncio==0.24.0",
+    "ruff==0.9.7",
+    "mypy==1.13.0",
+    "pre-commit==4.0.1",
+    "types-setuptools",
+]
+
+[project.urls]
+Repository = "local"
+Documentation = "docs/"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 130
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "N", "W", "B"]
+ignore = [
+    "UP007",
+    "UP006",
+    "B008",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+show_error_codes = true
+strict_optional = true
+warn_return_any = false
+warn_unused_ignores = false
+warn_unreachable = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "alembic.*"
+ignore_errors = true

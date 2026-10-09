@@ -1,10 +1,9 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/models/chat_models.dart';
 import '../../../core/services/aria_api.dart';
+import '../../../core/services/session_id_service.dart';
 
 
 class ChatScreen extends StatefulWidget {
@@ -15,51 +14,16 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  static const String _sessionIdKey = 'aria_session_id';
-
   final _api = AriaApi();
   final _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
   bool _isSending = false;
-  String? _sessionId;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSessionId();
-  }
-
-  Future<void> _loadSessionId() async {
-    final prefs = await SharedPreferences.getInstance();
-    final existing = prefs.getString(_sessionIdKey);
-    if (existing != null && existing.isNotEmpty) {
-      setState(() => _sessionId = existing);
-      return;
-    }
-    await _resetSessionId(prefs: prefs);
-  }
-
-  Future<void> _resetSessionId({SharedPreferences? prefs}) async {
-    final pref = prefs ?? await SharedPreferences.getInstance();
-    final generated = _generateSessionId();
-    await pref.setString(_sessionIdKey, generated);
-    if (mounted) {
-      setState(() {
-        _sessionId = generated;
-        _messages.clear();
-      });
-    }
-  }
-
-  String _generateSessionId() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
-    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-  }
 
   Future<void> _send() async {
     final prompt = _controller.text.trim();
     if (prompt.isEmpty || _isSending) return;
+
+    final service = Provider.of<SessionIdService>(context, listen: false);
 
     setState(() {
       _isSending = true;
@@ -68,7 +32,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      final answer = await _api.sendChat(prompt, sessionId: _sessionId);
+      final answer = await _api.sendChat(prompt, sessionId: service.sessionId);
       setState(() {
         _messages.add(ChatMessage(role: 'assistant', content: answer));
       });
@@ -85,6 +49,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final service = Provider.of<SessionIdService>(context, listen: true);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('ARIA Chat'),
@@ -94,8 +60,11 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: _isSending
                 ? null
                 : () async {
-                    await _resetSessionId();
+                    await service.reset();
                     if (mounted) {
+                      setState(() {
+                        _messages.clear();
+                      });
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Nueva conversacion iniciada.')),
                       );

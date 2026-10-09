@@ -1,4 +1,0 @@
-# Dependencias opcionales para activar voz real en local.
-# Instala este archivo solo cuando vayas a configurar STT/TTS.
-
-faster-whisper==1.1.1

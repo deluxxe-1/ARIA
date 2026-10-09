@@ -1,10 +1,9 @@
 import json
 from pathlib import Path
 
-from slugify import slugify
-
 from app.core.errors import ProfileNotFoundError
 from app.schemas.voice import VoiceProfileResponse
+from slugify import slugify
 
 
 class VoiceProfileStore:

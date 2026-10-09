@@ -1,11 +1,11 @@
-import 'dart:math';
-
+import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/models/chat_models.dart';
 import '../../../core/services/aria_api.dart';
+import '../../../core/services/session_id_service.dart';
 
 
 class VoiceScreen extends StatefulWidget {
@@ -17,44 +17,31 @@ class VoiceScreen extends StatefulWidget {
 
 
 class _VoiceScreenState extends State<VoiceScreen> {
-  static const String _sessionIdKey = 'aria_session_id';
-
   final _api = AriaApi();
   final _nameController = TextEditingController();
   final _hintController = TextEditingController();
+  final _ttsTextController = TextEditingController();
+  late final AudioPlayer _audioPlayer;
 
   List<VoiceProfile> _profiles = [];
   String? _selectedVoiceId;
   String? _lastTranscript;
   String? _lastAnswer;
+  String? _lastSynthesizedAudioPath;
   bool _isBusy = false;
-  String? _sessionId;
+  bool _isSynthesizing = false;
 
   @override
   void initState() {
     super.initState();
-    _loadSessionId();
+    _audioPlayer = AudioPlayer();
     _loadProfiles();
   }
 
-  Future<void> _loadSessionId() async {
-    final prefs = await SharedPreferences.getInstance();
-    final existing = prefs.getString(_sessionIdKey);
-    if (existing != null && existing.isNotEmpty) {
-      setState(() => _sessionId = existing);
-      return;
-    }
-    final generated = _generateSessionId();
-    await prefs.setString(_sessionIdKey, generated);
-    if (mounted) {
-      setState(() => _sessionId = generated);
-    }
-  }
-
-  String _generateSessionId() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
-    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProfiles() async {
@@ -111,16 +98,21 @@ class _VoiceScreenState extends State<VoiceScreen> {
     );
     if (result == null || result.files.isEmpty) return;
 
+    final service = Provider.of<SessionIdService>(context, listen: false);
+
     setState(() => _isBusy = true);
     try {
       final payload = await _api.sendAudioChat(
         audio: result.files.first,
-        sessionId: _sessionId,
+        sessionId: service.sessionId,
         voiceId: _selectedVoiceId,
       );
       setState(() {
         _lastTranscript = payload['transcript'] as String?;
         _lastAnswer = payload['answer'] as String?;
+        final synthPath = payload['synthesized_audio_path'] as String?;
+        _lastSynthesizedAudioPath =
+            synthPath != null && synthPath.isNotEmpty ? synthPath : null;
       });
     } catch (error) {
       if (mounted) {
@@ -133,13 +125,97 @@ class _VoiceScreenState extends State<VoiceScreen> {
     }
   }
 
+  Future<void> _synthesize() async {
+    final text = _ttsTextController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isSynthesizing = true);
+    try {
+      final response = await _api.synthesizeVoice(
+        text: text,
+        voiceId: _selectedVoiceId,
+        language: 'es',
+      );
+      final outputPath = response['output_path'] as String?;
+      if (outputPath != null && outputPath.isNotEmpty) {
+        await _audioPlayer.play(DeviceFileSource(outputPath));
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sintesis completada.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sintetizando: $error')),
+        );
+      }
+    } finally {
+      setState(() => _isSynthesizing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final service = Provider.of<SessionIdService>(context, listen: true);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('ARIA Voz')),
+      appBar: AppBar(
+        title: const Text('ARIA Voz'),
+        actions: [
+          IconButton(
+            tooltip: 'Nueva conversacion',
+            onPressed: _isBusy
+                ? null
+                : () async {
+                    await service.reset();
+                    if (mounted) {
+                      setState(() {
+                        _lastTranscript = null;
+                        _lastAnswer = null;
+                        _lastSynthesizedAudioPath = null;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Nueva conversacion iniciada.')),
+                      );
+                    }
+                  },
+            icon: const Icon(Icons.add_comment_outlined),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _ttsTextController,
+                    minLines: 1,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Texto a sintetizar',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: ElevatedButton.icon(
+                    onPressed: _isSynthesizing ? null : _synthesize,
+                    icon: const Icon(Icons.record_voice_over),
+                    label: Text(_isSynthesizing ? '...' : 'Sintetizar'),
+                  ),
+                ),
+              ],
+            ),
+          ),
           TextField(
             controller: _nameController,
             decoration: const InputDecoration(
@@ -190,7 +266,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
           ),
           const SizedBox(height: 24),
           if (_lastTranscript != null) ...[
-            Text('Transcripción', style: Theme.of(context).textTheme.titleMedium),
+            Text('Transcripcion', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Text(_lastTranscript!),
             const SizedBox(height: 16),
@@ -198,11 +274,26 @@ class _VoiceScreenState extends State<VoiceScreen> {
           if (_lastAnswer != null) ...[
             Text('Respuesta', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            Text(_lastAnswer!),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(_lastAnswer!),
+              subtitle: _lastSynthesizedAudioPath != null
+                  ? const Text('Audio disponible')
+                  : null,
+              trailing: _lastSynthesizedAudioPath != null
+                  ? IconButton(
+                      icon: const Icon(Icons.play_arrow),
+                      onPressed: () {
+                        _audioPlayer.play(DeviceFileSource(_lastSynthesizedAudioPath!));
+                      },
+                      tooltip: 'Reproducir audio sintetizado',
+                    )
+                  : null,
+            ),
           ],
           const SizedBox(height: 24),
           const Text(
-            'Consejo: usa un audio limpio, sin música, de 30 a 60 segundos para clonar la voz con mejor calidad.',
+            'Consejo: usa un audio limpio, sin musica, de 30 a 60 segundos para clonar la voz con mejor calidad.',
           ),
         ],
       ),
